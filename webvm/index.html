@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebVM Terminal</title>
+
+    <!-- xterm.js CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', 'Courier', monospace;
+            background: #000000;
+            color: #00ff00;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #header {
+            background: #0a0a0a;
+            padding: 8px 16px;
+            border-bottom: 1px solid #00ff00;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+
+        #header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        #header h1 {
+            font-size: 14px;
+            color: #00ff00;
+            font-weight: normal;
+            letter-spacing: 1px;
+        }
+
+        #user-info {
+            color: #00ff00;
+            font-size: 12px;
+        }
+
+        #logout-btn {
+            background: none;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 4px 12px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+
+        #logout-btn:hover {
+            background: #00ff00;
+            color: #000000;
+        }
+
+        #status {
+            font-size: 11px;
+            color: #00ff00;
+        }
+
+        #status.ready::before {
+            content: '● ';
+            color: #00ff00;
+        }
+
+        #terminal {
+            flex: 1;
+            padding: 10px;
+            background: #000000;
+        }
+
+        .xterm {
+            height: 100%;
+            width: 100%;
+        }
+
+        .xterm-viewport {
+            background-color: #000000 !important;
+        }
+
+        /* Login Screen */
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 5000;
+        }
+
+        #login-screen.hidden {
+            display: none;
+        }
+
+        #login-box {
+            border: 2px solid #00ff00;
+            padding: 30px 40px;
+            background: #0a0a0a;
+            min-width: 400px;
+        }
+
+        #login-title {
+            color: #00ff00;
+            font-size: 20px;
+            text-align: center;
+            margin-bottom: 25px;
+            letter-spacing: 2px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            color: #00ff00;
+            font-size: 12px;
+        }
+
+        .form-group input {
+            background: #000000;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #00ff00;
+            box-shadow: 0 0 5px #00ff00;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            background: #000000;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #00ff00;
+            color: #000000;
+        }
+
+        .login-message {
+            text-align: center;
+            margin-top: 15px;
+            color: #00ff00;
+            font-size: 11px;
+            min-height: 20px;
+        }
+
+        .login-message.error {
+            color: #ff0000;
+        }
+
+        .login-toggle {
+            text-align: center;
+            margin-top: 20px;
+            color: #00ff00;
+            font-size: 11px;
+        }
+
+        .login-toggle a {
+            color: #00ff00;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        .login-toggle a:hover {
+            color: #ffffff;
+        }
+
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #loader.hidden {
+            display: none;
+        }
+
+        .spinner {
+            border: 3px solid #0a0a0a;
+            border-top: 3px solid #00ff00;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #loader-text {
+            color: #00ff00;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        /* Text Editor */
+        #editor-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            display: none;
+            flex-direction: column;
+            z-index: 2000;
+        }
+
+        #editor-overlay.active {
+            display: flex;
+        }
+
+        #editor-header {
+            background: #0a0a0a;
+            padding: 8px 16px;
+            border-bottom: 1px solid #00ff00;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #editor-title {
+            color: #00ff00;
+            font-size: 13px;
+            letter-spacing: 1px;
+        }
+
+        #editor-help-text {
+            color: #00ff00;
+            font-size: 11px;
+        }
+
+        #editor-container {
+            flex: 1;
+            display: flex;
+            background: #000000;
+            overflow: hidden;
+        }
+
+        #editor-line-numbers {
+            background: #0a0a0a;
+            color: #006600;
+            padding: 20px 10px;
+            text-align: right;
+            user-select: none;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            border-right: 1px solid #00ff00;
+            min-width: 50px;
+            overflow: hidden;
+        }
+
+        #editor-textarea {
+            flex: 1;
+            background: #000000;
+            color: #00ff00;
+            border: none;
+            outline: none;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            resize: none;
+            white-space: pre;
+            overflow-wrap: normal;
+            overflow-x: auto;
+        }
+
+        #editor-footer {
+            background: #0a0a0a;
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #00ff00;
+            font-size: 11px;
+            border-top: 1px solid #00ff00;
+        }
+
+        #editor-position {
+            letter-spacing: 1px;
+        }
+
+        #editor-shortcuts {
+            display: flex;
+            gap: 15px;
+        }
+
+        .shortcut {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .key {
+            border: 1px solid #00ff00;
+            padding: 2px 6px;
+            font-size: 10px;
+        }
+
+        /* Notification */
+        #notification {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: #0a0a0a;
+            color: #00ff00;
+            padding: 12px 20px;
+            border: 1px solid #00ff00;
+            font-size: 12px;
+            z-index: 3000;
+            display: none;
+        }
+
+        #notification.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Terminal ASCII Art */
+        .ascii-banner {
+            color: #00ff00;
+            line-height: 1.2;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div id="login-box">
+            <div id="login-title">[ WEBVM TERMINAL ACCESS ]</div>
+            <div class="login-form">
+                <div class="form-group">
+                    <label for="username">USERNAME:</label>
+                    <input type="text" id="username" autocomplete="username" />
+                </div>
+                <div class="form-group">
+                    <label for="password">PASSWORD:</label>
+                    <input type="password" id="password" autocomplete="current-password" />
+                </div>
+                <div class="btn-group">
+                    <button class="btn" id="login-btn">LOGIN</button>
+                    <button class="btn" id="signup-btn">SIGN UP</button>
+                </div>
+                <div class="login-message" id="login-message"></div>
+            </div>
+            <div class="login-toggle">
+                <span id="toggle-text">New user? Click SIGN UP to create account.</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="loader" class="hidden">
+        <div class="spinner"></div>
+        <div id="loader-text">INITIALIZING SYSTEM...</div>
+    </div>
+
+    <div id="notification"></div>
+
+    <!-- Text Editor -->
+    <div id="editor-overlay">
+        <div id="editor-header">
+            <div id="editor-title">EDITOR</div>
+            <div id="editor-help-text">CTRL+H FOR HELP</div>
+        </div>
+        <div id="editor-container">
+            <div id="editor-line-numbers">1</div>
+            <textarea id="editor-textarea" spellcheck="false"></textarea>
+        </div>
+        <div id="editor-footer">
+            <div id="editor-position">LN 1, COL 1</div>
+            <div id="editor-shortcuts">
+                <div class="shortcut"><span class="key">^S</span> SAVE</div>
+                <div class="shortcut"><span class="key">^X</span> EXIT</div>
+                <div class="shortcut"><span class="key">^H</span> HELP</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="container">
+        <div id="header">
+            <div id="header-left">
+                <h1>WEBVM://TERMINAL</h1>
+                <div id="user-info"></div>
+            </div>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <div id="status">INITIALIZING</div>
+                <button id="logout-btn" style="display: none;">LOGOUT</button>
+            </div>
+        </div>
+        <div id="terminal"></div>
+    </div>
+
+    <!-- xterm.js -->
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+
+    <!-- Pyodide -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+
+    <script>
+        // Global state
+        let term;
+        let pyodide;
+        let currentDir = '/home';
+        let commandHistory = [];
+        let historyIndex = -1;
+        let currentLine = '';
+        let pythonREPL = false;
+        let currentUser = null;
+
+        // Editor state
+        let editorActive = false;
+        let editorFilePath = '';
+        let editorOriginalContent = '';
+
+        // Auth functions
+        function hashPassword(password) {
+            // Simple hash - in production use proper crypto
+            let hash = 0;
+            for (let i = 0; i < password.length; i++) {
+                const char = password.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return hash.toString(36);
+        }
+
+        function getUsers() {
+            const users = localStorage.getItem('webvm-users');
+            return users ? JSON.parse(users) : {};
+        }
+
+        function saveUsers(users) {
+            localStorage.setItem('webvm-users', JSON.stringify(users));
+        }
+
+        function createAccount(username, password) {
+            if (!username || !password) {
+                return { success: false, message: 'USERNAME AND PASSWORD REQUIRED' };
+            }
+            if (username.length < 3) {
+                return { success: false, message: 'USERNAME MUST BE AT LEAST 3 CHARACTERS' };
+            }
+            if (password.length < 4) {
+                return { success: false, message: 'PASSWORD MUST BE AT LEAST 4 CHARACTERS' };
+            }
+
+            const users = getUsers();
+            if (users[username]) {
+                return { success: false, message: 'USERNAME ALREADY EXISTS' };
+            }
+
+            users[username] = {
+                password: hashPassword(password),
+                created: new Date().toISOString()
+            };
+            saveUsers(users);
+
+            return { success: true, message: 'ACCOUNT CREATED SUCCESSFULLY' };
+        }
+
+        function login(username, password) {
+            if (!username || !password) {
+                return { success: false, message: 'USERNAME AND PASSWORD REQUIRED' };
+            }
+
+            const users = getUsers();
+            const user = users[username];
+
+            if (!user) {
+                return { success: false, message: 'INVALID USERNAME OR PASSWORD' };
+            }
+
+            if (user.password !== hashPassword(password)) {
+                return { success: false, message: 'INVALID USERNAME OR PASSWORD' };
+            }
+
+            return { success: true, message: 'LOGIN SUCCESSFUL' };
+        }
+
+        function logout() {
+            if (currentUser) {
+                // Auto-save on logout
+                saveUserSession();
+            }
+            currentUser = null;
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('logout-btn').style.display = 'none';
+            document.getElementById('user-info').textContent = '';
+            term.clear();
+        }
+
+        function saveUserSession() {
+            if (!currentUser) return;
+            try {
+                const state = pyodide.runPython('fs_export_state()');
+                if (!state.startsWith('ERROR:')) {
+                    localStorage.setItem(`webvm-session-${currentUser}`, state);
+                }
+            } catch (e) {
+                console.error('Failed to save session:', e);
+            }
+        }
+
+        async function loadUserSession() {
+            if (!currentUser) return;
+            try {
+                const state = localStorage.getItem(`webvm-session-${currentUser}`);
+                if (state) {
+                    const result = pyodide.runPython(`fs_import_state(${JSON.stringify(state)})`);
+                    if (!result.startsWith('ERROR:')) {
+                        const cwd = pyodide.runPython('fs_getcwd()');
+                        currentDir = cwd;
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load session:', e);
+            }
+        }
+
+        // Login UI handlers
+        document.getElementById('login-btn').addEventListener('click', async () => {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const messageEl = document.getElementById('login-message');
+
+            const result = login(username, password);
+            messageEl.textContent = result.message;
+            messageEl.className = 'login-message ' + (result.success ? '' : 'error');
+
+            if (result.success) {
+                currentUser = username;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('logout-btn').style.display = 'block';
+                document.getElementById('user-info').textContent = `USER: ${username}`;
+
+                // Show loader and initialize
+                document.getElementById('loader').classList.remove('hidden');
+                await initPyodide();
+                await loadUserSession();
+                document.getElementById('loader').classList.add('hidden');
+
+                showWelcome();
+                writePrompt();
+            }
+        });
+
+        document.getElementById('signup-btn').addEventListener('click', () => {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const messageEl = document.getElementById('login-message');
+
+            const result = createAccount(username, password);
+            messageEl.textContent = result.message;
+            messageEl.className = 'login-message ' + (result.success ? '' : 'error');
+
+            if (result.success) {
+                setTimeout(() => {
+                    messageEl.textContent = 'NOW YOU CAN LOGIN';
+                    document.getElementById('password').value = '';
+                }, 1500);
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', logout);
+
+        // Allow Enter key in login
+        document.getElementById('password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('login-btn').click();
+            }
+        });
+
+        // Initialize terminal
+        function initTerminal() {
+            term = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: '"Courier New", "Courier", monospace',
+                theme: {
+                    background: '#000000',
+                    foreground: '#00ff00',
+                    cursor: '#00ff00',
+                    black: '#000000',
+                    red: '#ff0000',
+                    green: '#00ff00',
+                    yellow: '#ffff00',
+                    blue: '#0000ff',
+                    magenta: '#ff00ff',
+                    cyan: '#00ffff',
+                    white: '#ffffff',
+                    brightBlack: '#555555',
+                    brightRed: '#ff5555',
+                    brightGreen: '#55ff55',
+                    brightYellow: '#ffff55',
+                    brightBlue: '#5555ff',
+                    brightMagenta: '#ff55ff',
+                    brightCyan: '#55ffff',
+                    brightWhite: '#ffffff'
+                }
+            });
+
+            const fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+            term.open(document.getElementById('terminal'));
+            fitAddon.fit();
+
+            window.addEventListener('resize', () => {
+                fitAddon.fit();
+            });
+
+            term.onData(handleTerminalInput);
+
+            return term;
+        }
+
+        // Initialize Pyodide and filesystem
+        async function initPyodide() {
+            const loaderText = document.getElementById('loader-text');
+
+            loaderText.textContent = 'LOADING PYTHON RUNTIME...';
+            pyodide = await loadPyodide({
+                indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/'
+            });
+
+            loaderText.textContent = 'INITIALIZING FILESYSTEM...';
+
+            // Setup filesystem helper functions in Python
+            await pyodide.runPythonAsync(`
+import os
+import sys
+import json
+from pathlib import Path
+
+# Initialize filesystem
+os.makedirs('/home', exist_ok=True)
+os.chdir('/home')
+
+# Filesystem helper functions
+def fs_list_dir(path):
+    """List directory contents with type information"""
+    try:
+        items = []
+        for item in os.listdir(path):
+            full_path = os.path.join(path, item)
+            is_dir = os.path.isdir(full_path)
+            items.append({'name': item, 'is_dir': is_dir})
+        return json.dumps(items)
+    except Exception as e:
+        return json.dumps({'error': str(e)})
+
+def fs_read_file(path):
+    """Read file contents"""
+    try:
+        with open(path, 'r') as f:
+            return f.read()
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_write_file(path, content, append=False):
+    """Write to file"""
+    try:
+        mode = 'a' if append else 'w'
+        with open(path, mode) as f:
+            f.write(content)
+        return "OK"
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_mkdir(path):
+    """Create directory"""
+    try:
+        os.makedirs(path, exist_ok=True)
+        return "OK"
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_remove(path):
+    """Remove file or directory"""
+    try:
+        if os.path.isdir(path):
+            import shutil
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+        return "OK"
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_exists(path):
+    """Check if path exists"""
+    return os.path.exists(path)
+
+def fs_is_dir(path):
+    """Check if path is directory"""
+    return os.path.isdir(path)
+
+def fs_chdir(path):
+    """Change directory"""
+    try:
+        os.chdir(path)
+        return os.getcwd()
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_getcwd():
+    """Get current directory"""
+    return os.getcwd()
+
+def fs_touch(path):
+    """Create empty file or update timestamp"""
+    try:
+        Path(path).touch()
+        return "OK"
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_copy(src, dst):
+    """Copy file or directory"""
+    try:
+        import shutil
+        if os.path.isdir(src):
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
+        return "OK"
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_move(src, dst):
+    """Move/rename file or directory"""
+    try:
+        import shutil
+        shutil.move(src, dst)
+        return "OK"
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_grep(pattern, path, recursive=False):
+    """Search for pattern in files"""
+    try:
+        import re
+        results = []
+
+        def search_file(filepath):
+            try:
+                with open(filepath, 'r') as f:
+                    for line_num, line in enumerate(f, 1):
+                        if re.search(pattern, line):
+                            results.append({
+                                'file': filepath,
+                                'line': line_num,
+                                'content': line.rstrip()
+                            })
+            except:
+                pass
+
+        if os.path.isfile(path):
+            search_file(path)
+        elif os.path.isdir(path):
+            if recursive:
+                for root, dirs, files in os.walk(path):
+                    for file in files:
+                        search_file(os.path.join(root, file))
+            else:
+                for item in os.listdir(path):
+                    filepath = os.path.join(path, item)
+                    if os.path.isfile(filepath):
+                        search_file(filepath)
+
+        return json.dumps(results)
+    except Exception as e:
+        return json.dumps({'error': str(e)})
+
+def fs_tree(path, prefix="", max_depth=10, current_depth=0):
+    """Generate tree structure"""
+    try:
+        if current_depth >= max_depth:
+            return ""
+
+        items = sorted(os.listdir(path))
+        tree = ""
+
+        for i, item in enumerate(items):
+            is_last = i == len(items) - 1
+            item_path = os.path.join(path, item)
+
+            connector = "└── " if is_last else "├── "
+            tree += prefix + connector + item
+
+            if os.path.isdir(item_path):
+                tree += "/\\n"
+                extension = "    " if is_last else "│   "
+                tree += fs_tree(item_path, prefix + extension, max_depth, current_depth + 1)
+            else:
+                tree += "\\n"
+
+        return tree
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_export_state():
+    """Export entire filesystem state"""
+    try:
+        import base64
+        state = {}
+
+        def scan_dir(path):
+            for item in os.listdir(path):
+                item_path = os.path.join(path, item)
+                if os.path.isfile(item_path):
+                    try:
+                        with open(item_path, 'r') as f:
+                            state[item_path] = f.read()
+                    except:
+                        pass
+                elif os.path.isdir(item_path):
+                    scan_dir(item_path)
+
+        scan_dir('/home')
+        return json.dumps(state)
+    except Exception as e:
+        return f"ERROR: {e}"
+
+def fs_import_state(state_json):
+    """Import filesystem state"""
+    try:
+        import shutil
+        state = json.loads(state_json)
+
+        # Clear /home
+        for item in os.listdir('/home'):
+            item_path = os.path.join('/home', item)
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+            else:
+                os.remove(item_path)
+
+        # Restore files
+        for filepath, content in state.items():
+            dir_path = os.path.dirname(filepath)
+            if dir_path:
+                os.makedirs(dir_path, exist_ok=True)
+            with open(filepath, 'w') as f:
+                f.write(content)
+
+        return "OK"
+    except Exception as e:
+        return f"ERROR: {e}"
+
+# Output capture for Python execution
+class OutputCapture:
+    def __init__(self):
+        self.buffer = []
+
+    def write(self, text):
+        self.buffer.append(text)
+
+    def flush(self):
+        pass
+
+    def get_output(self):
+        return ''.join(self.buffer)
+
+    def clear(self):
+        self.buffer = []
+
+_output_capture = OutputCapture()
+`);
+
+            // Create example files only if this is a new session
+            const hasExistingSession = localStorage.getItem(`webvm-session-${currentUser}`);
+            if (!hasExistingSession) {
+                loaderText.textContent = 'CREATING WELCOME FILES...';
+
+                await pyodide.runPythonAsync(`
+# Create hello.py
+fs_write_file('/home/hello.py', """print("Hello from WebVM!")
+print("This is Python running in WebAssembly")
+print("Welcome, """ + ${JSON.stringify(currentUser)} + """!")
+""")
+
+# Create script.py
+fs_write_file('/home/script.py', """# File I/O demonstration
+print("Writing to a file...")
+with open('output.txt', 'w') as f:
+    f.write('Hello from Python in WASM!\\\\n')
+    f.write('Completely isolated filesystem.\\\\n')
+
+print("Reading from the file...")
+with open('output.txt', 'r') as f:
+    content = f.read()
+    print(content)
+
+print("File I/O complete!")
+""")
+
+# Create README.txt
+fs_write_file('/home/README.txt', """WEBVM TERMINAL - USER MANUAL
+=============================
+
+AUTHENTICATION:
+Your session is tied to your account. All files persist between logins.
+Use 'logout' command to sign out.
+
+FILE OPERATIONS:
+ls, cd, pwd, cat, edit, touch, mkdir, rm, cp, mv
+
+SEARCH & DISPLAY:
+grep, tree, history
+
+PYTHON:
+python <file>, python (REPL), pip install <package>
+
+NETWORK:
+wget <url> [filename]
+
+OTHER:
+echo, clear, help, whoami, logout
+
+Your files are automatically saved to your account.
+Type 'help' for detailed command list.
+""")
+`);
+            }
+
+            loaderText.textContent = 'SYSTEM READY';
+            document.getElementById('status').textContent = 'READY';
+            document.getElementById('status').classList.add('ready');
+        }
+
+        // Handle terminal input
+        function handleTerminalInput(data) {
+            const code = data.charCodeAt(0);
+
+            if (code === 13) { // Enter
+                term.write('\r\n');
+                if (pythonREPL) {
+                    handlePythonREPL(currentLine);
+                } else {
+                    executeCommand(currentLine.trim());
+                }
+                if (currentLine.trim()) {
+                    commandHistory.push(currentLine);
+                    historyIndex = commandHistory.length;
+                }
+                currentLine = '';
+                if (!pythonREPL) {
+                    writePrompt();
+                } else {
+                    term.write('>>> ');
+                }
+            } else if (code === 127) { // Backspace
+                if (currentLine.length > 0) {
+                    currentLine = currentLine.slice(0, -1);
+                    term.write('\b \b');
+                }
+            } else if (code === 3) { // Ctrl+C
+                if (pythonREPL) {
+                    term.write('^C\r\n');
+                    pythonREPL = false;
+                    writePrompt();
+                    currentLine = '';
+                }
+            } else if (code >= 32 && code <= 126) { // Printable characters
+                currentLine += data;
+                term.write(data);
+            }
+        }
+
+        // Execute shell command
+        async function executeCommand(cmd) {
+            if (!cmd) return;
+
+            const parts = parseCommand(cmd);
+            const command = parts[0];
+            const args = parts.slice(1);
+
+            try {
+                switch(command) {
+                    case 'help':
+                        showHelp();
+                        break;
+                    case 'clear':
+                        term.clear();
+                        break;
+                    case 'whoami':
+                        term.writeln(currentUser);
+                        break;
+                    case 'logout':
+                        logout();
+                        break;
+                    case 'pwd':
+                        const cwd = pyodide.runPython('fs_getcwd()');
+                        term.writeln(cwd);
+                        currentDir = cwd;
+                        break;
+                    case 'ls':
+                        await listDirectory(args[0] || currentDir);
+                        break;
+                    case 'cd':
+                        await changeDirectory(args[0] || '/home');
+                        break;
+                    case 'cat':
+                        if (!args[0]) {
+                            term.writeln('cat: missing file operand');
+                        } else {
+                            await catFile(args[0]);
+                        }
+                        break;
+                    case 'edit':
+                        if (!args[0]) {
+                            term.writeln('edit: missing file operand');
+                        } else {
+                            await openEditor(args[0]);
+                        }
+                        break;
+                    case 'echo':
+                        await handleEcho(cmd);
+                        break;
+                    case 'mkdir':
+                        if (!args[0]) {
+                            term.writeln('mkdir: missing operand');
+                        } else {
+                            await makeDirectory(args[0]);
+                        }
+                        break;
+                    case 'touch':
+                        if (!args[0]) {
+                            term.writeln('touch: missing file operand');
+                        } else {
+                            await touchFile(args[0]);
+                        }
+                        break;
+                    case 'rm':
+                        if (!args[0]) {
+                            term.writeln('rm: missing operand');
+                        } else {
+                            await removeFile(args[0]);
+                        }
+                        break;
+                    case 'cp':
+                        if (args.length < 2) {
+                            term.writeln('cp: missing operand');
+                        } else {
+                            await copyFile(args[0], args[1]);
+                        }
+                        break;
+                    case 'mv':
+                        if (args.length < 2) {
+                            term.writeln('mv: missing operand');
+                        } else {
+                            await moveFile(args[0], args[1]);
+                        }
+                        break;
+                    case 'grep':
+                        if (args.length < 2) {
+                            term.writeln('grep: missing operand');
+                        } else {
+                            await grepFile(args[0], args[1], args[2] === '-r');
+                        }
+                        break;
+                    case 'tree':
+                        await showTree(args[0] || currentDir);
+                        break;
+                    case 'history':
+                        showHistory();
+                        break;
+                    case 'wget':
+                        if (!args[0]) {
+                            term.writeln('wget: missing URL');
+                        } else {
+                            await downloadFile(args[0], args[1]);
+                        }
+                        break;
+                    case 'pip':
+                        if (args[0] === 'install' && args[1]) {
+                            await installPackage(args[1]);
+                        } else {
+                            term.writeln('Usage: pip install <package>');
+                        }
+                        break;
+                    case 'python':
+                        if (args[0]) {
+                            await executePythonFile(args[0]);
+                        } else {
+                            startPythonREPL();
+                        }
+                        break;
+                    case '':
+                        break;
+                    default:
+                        term.writeln(`${command}: command not found`);
+                }
+            } catch (error) {
+                term.writeln(`Error: ${error.message}`);
+            }
+        }
+
+        function parseCommand(cmd) {
+            return cmd.match(/(?:[^\s"]+|"[^"]*")+/g)?.map(s => s.replace(/^"|"$/g, '')) || [];
+        }
+
+        function showHelp() {
+            term.writeln('=== WEBVM COMMAND REFERENCE ===');
+            term.writeln('');
+            term.writeln('AUTHENTICATION:');
+            term.writeln('  whoami            - Show current user');
+            term.writeln('  logout            - Sign out (auto-saves session)');
+            term.writeln('');
+            term.writeln('FILE OPERATIONS:');
+            term.writeln('  ls [dir]          - List directory contents');
+            term.writeln('  cd <dir>          - Change directory');
+            term.writeln('  pwd               - Print working directory');
+            term.writeln('  cat <file>        - Display file contents');
+            term.writeln('  edit <file>       - Edit file in built-in editor');
+            term.writeln('  touch <file>      - Create empty file');
+            term.writeln('  mkdir <dir>       - Create directory');
+            term.writeln('  rm <path>         - Remove file or directory');
+            term.writeln('  cp <src> <dst>    - Copy file or directory');
+            term.writeln('  mv <src> <dst>    - Move/rename file or directory');
+            term.writeln('');
+            term.writeln('SEARCH & DISPLAY:');
+            term.writeln('  grep <pattern> <path> [-r] - Search in files');
+            term.writeln('  tree [dir]        - Display directory tree');
+            term.writeln('');
+            term.writeln('PYTHON:');
+            term.writeln('  python <file>     - Execute Python file');
+            term.writeln('  python            - Start interactive REPL');
+            term.writeln('  pip install <pkg> - Install Python package');
+            term.writeln('');
+            term.writeln('NETWORK:');
+            term.writeln('  wget <url> [file] - Download file from internet');
+            term.writeln('');
+            term.writeln('OTHER:');
+            term.writeln('  echo <text>       - Print text (supports > >>)');
+            term.writeln('  history           - Show command history');
+            term.writeln('  clear             - Clear terminal');
+            term.writeln('  help              - Show this help');
+            term.writeln('');
+            term.writeln('NOTE: All files auto-save to your account.');
+        }
+
+        async function listDirectory(path) {
+            try {
+                const fullPath = resolvePath(path);
+                const exists = pyodide.runPython(`fs_exists(${JSON.stringify(fullPath)})`);
+                if (!exists) {
+                    term.writeln(`ls: cannot access '${path}': No such file or directory`);
+                    return;
+                }
+
+                const isDir = pyodide.runPython(`fs_is_dir(${JSON.stringify(fullPath)})`);
+                if (!isDir) {
+                    term.writeln(path);
+                    return;
+                }
+
+                const result = pyodide.runPython(`fs_list_dir(${JSON.stringify(fullPath)})`);
+                const items = JSON.parse(result);
+
+                if (items.error) {
+                    term.writeln(`ls: ${items.error}`);
+                    return;
+                }
+
+                items.forEach(item => {
+                    term.writeln(item.is_dir ? `${item.name}/` : item.name);
+                });
+            } catch (error) {
+                term.writeln(`ls: ${error.message}`);
+            }
+        }
+
+        async function changeDirectory(path) {
+            try {
+                const fullPath = resolvePath(path);
+                const result = pyodide.runPython(`fs_chdir(${JSON.stringify(fullPath)})`);
+
+                if (result.startsWith('ERROR:')) {
+                    term.writeln(`cd: ${path}: No such file or directory`);
+                } else {
+                    currentDir = result;
+                }
+            } catch (error) {
+                term.writeln(`cd: ${error.message}`);
+            }
+        }
+
+        async function catFile(path) {
+            try {
+                const fullPath = resolvePath(path);
+                const content = pyodide.runPython(`fs_read_file(${JSON.stringify(fullPath)})`);
+
+                if (content.startsWith('ERROR:')) {
+                    term.writeln(`cat: ${path}: No such file or directory`);
+                } else {
+                    term.writeln(content);
+                }
+            } catch (error) {
+                term.writeln(`cat: ${error.message}`);
+            }
+        }
+
+        async function copyFile(src, dst) {
+            try {
+                const srcPath = resolvePath(src);
+                const dstPath = resolvePath(dst);
+                const result = pyodide.runPython(`fs_copy(${JSON.stringify(srcPath)}, ${JSON.stringify(dstPath)})`);
+
+                if (result.startsWith('ERROR:')) {
+                    term.writeln(`cp: ${result.substring(7)}`);
+                } else {
+                    showNotification(`COPIED ${src} TO ${dst}`);
+                }
+            } catch (error) {
+                term.writeln(`cp: ${error.message}`);
+            }
+        }
+
+        async function moveFile(src, dst) {
+            try {
+                const srcPath = resolvePath(src);
+                const dstPath = resolvePath(dst);
+                const result = pyodide.runPython(`fs_move(${JSON.stringify(srcPath)}, ${JSON.stringify(dstPath)})`);
+
+                if (result.startsWith('ERROR:')) {
+                    term.writeln(`mv: ${result.substring(7)}`);
+                } else {
+                    showNotification(`MOVED ${src} TO ${dst}`);
+                }
+            } catch (error) {
+                term.writeln(`mv: ${error.message}`);
+            }
+        }
+
+        async function grepFile(pattern, path, recursive) {
+            try {
+                const fullPath = resolvePath(path);
+                const result = pyodide.runPython(
+                    `fs_grep(${JSON.stringify(pattern)}, ${JSON.stringify(fullPath)}, ${recursive})`
+                );
+                const matches = JSON.parse(result);
+
+                if (matches.error) {
+                    term.writeln(`grep: ${matches.error}`);
+                    return;
+                }
+
+                if (matches.length === 0) {
+                    term.writeln('No matches found');
+                } else {
+                    matches.forEach(match => {
+                        term.writeln(`${match.file}:${match.line}: ${match.content}`);
+                    });
+                    term.writeln(`[${matches.length} match(es)]`);
+                }
+            } catch (error) {
+                term.writeln(`grep: ${error.message}`);
+            }
+        }
+
+        async function showTree(path) {
+            try {
+                const fullPath = resolvePath(path);
+                const result = pyodide.runPython(`fs_tree(${JSON.stringify(fullPath)})`);
+
+                if (result.startsWith('ERROR:')) {
+                    term.writeln(`tree: ${result.substring(7)}`);
+                } else {
+                    term.writeln(`${fullPath}/`);
+                    term.writeln(result);
+                }
+            } catch (error) {
+                term.writeln(`tree: ${error.message}`);
+            }
+        }
+
+        function showHistory() {
+            if (commandHistory.length === 0) {
+                term.writeln('No commands in history');
+                return;
+            }
+            commandHistory.forEach((cmd, i) => {
+                term.writeln(`  ${i + 1}  ${cmd}`);
+            });
+        }
+
+        async function downloadFile(url, filename) {
+            try {
+                term.writeln(`Downloading ${url}...`);
+
+                const response = await fetch(url);
+                if (!response.ok) {
+                    term.writeln(`wget: HTTP ${response.status}`);
+                    return;
+                }
+
+                const content = await response.text();
+                const name = filename || url.split('/').pop() || 'download.txt';
+                const fullPath = resolvePath(name);
+
+                const result = pyodide.runPython(
+                    `fs_write_file(${JSON.stringify(fullPath)}, ${JSON.stringify(content)})`
+                );
+
+                if (result.startsWith('ERROR:')) {
+                    term.writeln(`wget: ${result.substring(7)}`);
+                } else {
+                    showNotification(`DOWNLOADED ${name}`);
+                    term.writeln(`Saved to ${name}`);
+                }
+            } catch (error) {
+                term.writeln(`wget: ${error.message}`);
+            }
+        }
+
+        async function installPackage(packageName) {
+            try {
+                term.writeln(`Installing ${packageName}...`);
+
+                await pyodide.loadPackage('micropip');
+                const micropip = pyodide.pyimport('micropip');
+                await micropip.install(packageName);
+
+                showNotification(`INSTALLED ${packageName}`);
+                term.writeln(`Successfully installed ${packageName}`);
+            } catch (error) {
+                term.writeln(`pip: ${error.message}`);
+            }
+        }
+
+        async function handleEcho(cmd) {
+            const redirectMatch = cmd.match(/echo\s+(.+?)\s*(>>?)\s*(.+)/);
+
+            if (redirectMatch) {
+                const text = redirectMatch[1].replace(/^["']|["']$/g, '');
+                const operator = redirectMatch[2];
+                const filename = redirectMatch[3].trim();
+                const append = operator === '>>';
+
+                try {
+                    const fullPath = resolvePath(filename);
+                    const result = pyodide.runPython(
+                        `fs_write_file(${JSON.stringify(fullPath)}, ${JSON.stringify(text + '\n')}, ${append})`
+                    );
+
+                    if (result.startsWith('ERROR:')) {
+                        term.writeln(`echo: ${result.substring(7)}`);
+                    }
+                } catch (error) {
+                    term.writeln(`echo: ${error.message}`);
+                }
+            } else {
+                const text = cmd.substring(5).replace(/^["']|["']$/g, '');
+                term.writeln(text);
+            }
+        }
+
+        async function makeDirectory(path) {
+            try {
+                const fullPath = resolvePath(path);
+                const result = pyodide.runPython(`fs_mkdir(${JSON.stringify(fullPath)})`);
+
+                if (result.startsWith('ERROR:')) {
+                    term.writeln(`mkdir: ${result.substring(7)}`);
+                }
+            } catch (error) {
+                term.writeln(`mkdir: ${error.message}`);
+            }
+        }
+
+        async function touchFile(path) {
+            try {
+                const fullPath = resolvePath(path);
+                const result = pyodide.runPython(`fs_touch(${JSON.stringify(fullPath)})`);
+
+                if (result.startsWith('ERROR:')) {
+                    term.writeln(`touch: ${result.substring(7)}`);
+                }
+            } catch (error) {
+                term.writeln(`touch: ${error.message}`);
+            }
+        }
+
+        async function removeFile(path) {
+            try {
+                const fullPath = resolvePath(path);
+                const result = pyodide.runPython(`fs_remove(${JSON.stringify(fullPath)})`);
+
+                if (result.startsWith('ERROR:')) {
+                    term.writeln(`rm: ${result.substring(7)}`);
+                }
+            } catch (error) {
+                term.writeln(`rm: ${error.message}`);
+            }
+        }
+
+        async function executePythonFile(filename) {
+            try {
+                const fullPath = resolvePath(filename);
+
+                const exists = pyodide.runPython(`fs_exists(${JSON.stringify(fullPath)})`);
+                if (!exists) {
+                    term.writeln(`python: can't open file '${filename}'`);
+                    return;
+                }
+
+                const code = pyodide.runPython(`fs_read_file(${JSON.stringify(fullPath)})`);
+
+                if (code.startsWith('ERROR:')) {
+                    term.writeln(`python: ${code.substring(7)}`);
+                    return;
+                }
+
+                await pyodide.runPythonAsync(`
+_output_capture.clear()
+sys.stdout = _output_capture
+sys.stderr = _output_capture
+`);
+
+                try {
+                    await pyodide.runPythonAsync(code);
+                } catch (error) {
+                    term.writeln(`Python error: ${error.message}`);
+                }
+
+                const output = pyodide.runPython('_output_capture.get_output()');
+                if (output) {
+                    output.split('\n').forEach(line => {
+                        if (line || output.endsWith('\n')) {
+                            term.writeln(line);
+                        }
+                    });
+                }
+
+                await pyodide.runPythonAsync(`
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
+`);
+
+                // Auto-save after running Python
+                saveUserSession();
+            } catch (error) {
+                term.writeln(`python: ${error.message}`);
+            }
+        }
+
+        function startPythonREPL() {
+            pythonREPL = true;
+            term.writeln('Python REPL. Type exit() to quit.');
+            term.write('>>> ');
+        }
+
+        async function handlePythonREPL(line) {
+            if (line.trim() === 'exit()' || line.trim() === 'quit()') {
+                pythonREPL = false;
+                return;
+            }
+
+            try {
+                await pyodide.runPythonAsync(`
+_output_capture.clear()
+sys.stdout = _output_capture
+sys.stderr = _output_capture
+`);
+
+                try {
+                    await pyodide.runPythonAsync(`
+import builtins
+try:
+    _result = eval(${JSON.stringify(line)})
+    if _result is not None:
+        builtins.print(repr(_result))
+except SyntaxError:
+    exec(${JSON.stringify(line)})
+`);
+                } catch (e) {
+                    await pyodide.runPythonAsync(line);
+                }
+
+                const output = pyodide.runPython('_output_capture.get_output()');
+                if (output) {
+                    output.split('\n').forEach(line => {
+                        if (line || output.endsWith('\n')) {
+                            term.writeln(line);
+                        }
+                    });
+                }
+
+                await pyodide.runPythonAsync(`
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
+`);
+            } catch (error) {
+                term.writeln(`Error: ${error.message}`);
+            }
+        }
+
+        async function openEditor(filename) {
+            const fullPath = resolvePath(filename);
+            editorFilePath = fullPath;
+
+            const exists = pyodide.runPython(`fs_exists(${JSON.stringify(fullPath)})`);
+            if (!exists) {
+                pyodide.runPython(`fs_touch(${JSON.stringify(fullPath)})`);
+            }
+
+            const content = pyodide.runPython(`fs_read_file(${JSON.stringify(fullPath)})`);
+            editorOriginalContent = content.startsWith('ERROR:') ? '' : content;
+
+            const textarea = document.getElementById('editor-textarea');
+            const overlay = document.getElementById('editor-overlay');
+            const title = document.getElementById('editor-title');
+
+            textarea.value = editorOriginalContent;
+            title.textContent = `EDITING: ${filename}`;
+
+            overlay.classList.add('active');
+            editorActive = true;
+            textarea.focus();
+
+            updateLineNumbers();
+            updateEditorPosition();
+        }
+
+        function closeEditor(save = false) {
+            const overlay = document.getElementById('editor-overlay');
+            const textarea = document.getElementById('editor-textarea');
+
+            if (save) {
+                const content = textarea.value;
+                const result = pyodide.runPython(
+                    `fs_write_file(${JSON.stringify(editorFilePath)}, ${JSON.stringify(content)})`
+                );
+
+                if (result === 'OK') {
+                    showNotification('FILE SAVED');
+                    saveUserSession(); // Auto-save on edit
+                } else {
+                    alert(`Error: ${result.substring(7)}`);
+                    return;
+                }
+            }
+
+            overlay.classList.remove('active');
+            editorActive = false;
+            editorFilePath = '';
+            editorOriginalContent = '';
+            textarea.value = '';
+
+            term.focus();
+        }
+
+        function updateLineNumbers() {
+            const textarea = document.getElementById('editor-textarea');
+            const lineNumbers = document.getElementById('editor-line-numbers');
+            const lines = textarea.value.split('\n').length;
+
+            let numbersHTML = '';
+            for (let i = 1; i <= lines; i++) {
+                numbersHTML += i + '\n';
+            }
+            lineNumbers.textContent = numbersHTML;
+        }
+
+        function updateEditorPosition() {
+            const textarea = document.getElementById('editor-textarea');
+            const position = document.getElementById('editor-position');
+
+            const text = textarea.value.substring(0, textarea.selectionStart);
+            const lines = text.split('\n');
+            const line = lines.length;
+            const col = lines[lines.length - 1].length + 1;
+
+            position.textContent = `LN ${line}, COL ${col}`;
+        }
+
+        function showEditorHelp() {
+            alert(`
+WEBVM TEXT EDITOR HELP
+======================
+
+SHORTCUTS:
+  Ctrl+S : Save file
+  Ctrl+X : Exit (prompts if unsaved)
+  Ctrl+H : Show this help
+
+FEATURES:
+  - Line numbers
+  - Position tracking
+  - Auto-save to account
+
+Press OK to continue...
+            `);
+        }
+
+        document.getElementById('editor-textarea').addEventListener('input', () => {
+            updateLineNumbers();
+            updateEditorPosition();
+        });
+
+        document.getElementById('editor-textarea').addEventListener('click', updateEditorPosition);
+        document.getElementById('editor-textarea').addEventListener('keyup', updateEditorPosition);
+
+        document.getElementById('editor-textarea').addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 's') {
+                    e.preventDefault();
+                    closeEditor(true);
+                } else if (e.key === 'x') {
+                    e.preventDefault();
+                    const textarea = document.getElementById('editor-textarea');
+                    if (textarea.value !== editorOriginalContent) {
+                        if (confirm('Save changes?')) {
+                            closeEditor(true);
+                        } else {
+                            closeEditor(false);
+                        }
+                    } else {
+                        closeEditor(false);
+                    }
+                } else if (e.key === 'h') {
+                    e.preventDefault();
+                    showEditorHelp();
+                }
+            }
+        });
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function resolvePath(path) {
+            if (!path) return currentDir;
+            if (path.startsWith('/')) {
+                return path;
+            }
+            if (currentDir === '/') {
+                return `/${path}`;
+            }
+            return `${currentDir}/${path}`;
+        }
+
+        function writePrompt() {
+            term.write(`${currentUser}@webvm:${currentDir}$ `);
+        }
+
+        function showWelcome() {
+            term.writeln('╔════════════════════════════════════════════════════════════╗');
+            term.writeln('║           WEBVM TERMINAL ACCESS GRANTED                   ║');
+            term.writeln('║           Python Runtime + Virtual Filesystem             ║');
+            term.writeln('╚════════════════════════════════════════════════════════════╝');
+            term.writeln('');
+            term.writeln(`Welcome back, ${currentUser}!`);
+            term.writeln('');
+            term.writeln('Your session has been restored.');
+            term.writeln('All files are automatically saved to your account.');
+            term.writeln('');
+            term.writeln('Type "help" for commands or try:');
+            term.writeln('  edit hello.py');
+            term.writeln('  python hello.py');
+            term.writeln('  tree');
+            term.writeln('');
+        }
+
+        // Auto-save on page unload
+        window.addEventListener('beforeunload', () => {
+            if (currentUser) {
+                saveUserSession();
+            }
+        });
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            term = initTerminal();
+            document.getElementById('username').focus();
+        });
+    </script>
+</body>
+</html>
